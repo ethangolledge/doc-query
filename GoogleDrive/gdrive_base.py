@@ -10,6 +10,7 @@ class GoogleDrive:
         self.folder_id = folder_id
         self.api_key = os.getenv("API_KEY")
         self.cwd = os.getcwd()
+        self.root_dir = os.chdir(..)
     
         if not self.api_key:
             raise ValueError("API_KEY environment variable not set.")
@@ -49,13 +50,13 @@ class GoogleDrive:
             print(f"Warning: Could not access folder {folder_id}. Error: {error}")
 
     def get_files_by_type(self, file_type: str):
-        """gets a list of all files of a specific type, searching recursively"""
+        """gets a list of all files of a specific type"""
         files_found = []
         self._find_files_by_type(self.folder_id, file_type, files_found)
         return files_found
 
     def _find_files_by_type(self, folder_id, file_type, file_list):
-        """helper method to recursively find files of a given mimeType"""
+        """helper to recursively find files"""
         try:
             page_token = None
             while True:
@@ -67,11 +68,19 @@ class GoogleDrive:
                 ).execute()
 
                 for file in response.get("files", []):
+                    file_id = file.get("id")
+                    file_name = file.get("name")
                     mime_type = file.get("mimeType")
+                    
                     if mime_type == file_type:
-                        file_list.append(file)
+                        file_list.append({
+                            'id': file_id,
+                            'name': file_name,
+                            'mimeType': mime_type,
+                        })
+
                     if mime_type == "application/vnd.google-apps.folder":
-                        self._find_files_by_type(file.get("id"), file_type, file_list)
+                        self._find_files_by_type(file_id, file_type, file_list)
 
                 page_token = response.get('nextPageToken')
                 if not page_token:
@@ -79,23 +88,24 @@ class GoogleDrive:
         except HttpError as error:
             print(f"Warning: Could not access folder {folder_id}. Error: {error}")
 
-    def download_file(self, file_id, file_name, mime_type, download_path="downloads"):
-        """downloads a single file""""
+    def download_file(self, file_info, base_download_path="epstein-docs"):
+        """downloads a single file into a flat directory and returns a status"""
+        file_id = file_info['id']
+        file_name = file_info['name']
+        mime_type = file_info['mimeType']
 
-        output_dir = os.path.join(self.cwd, download_path)
+        output_dir = os.path.join(self.root_dir, base_download_path)
         os.makedirs(output_dir, exist_ok=True)
         file_path = os.path.join(output_dir, file_name)
 
         try:
             request = self.service.files().get_media(fileId=file_id)
-            print(f"Downloading: '{file_name}'")
-            with open(file_path, 'wb') as f:
-                downloader = MediaIoBaseDownload(f, request)
-                done = False
-                while not done:
-                    status, done = downloader.next_chunk()
-                    if status:
-                        print(f"-> Progress: {int(status.progress() * 100)}%")
-            print(f"Success: '{file_name}' saved to '{output_dir}'")
+            downloader = MediaIoBaseDownload(open(file_path, 'wb'), request)
+            
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+            
+            return f"Success: '{file_name}' saved to '{output_dir}'"
         except HttpError as error:
-            print(f"Error downloading '{file_name}': {error}")
+            return f"Error on '{file_name}': {error}"
