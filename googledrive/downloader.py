@@ -18,11 +18,10 @@ def format_list_with_and(items: list[str]) -> str:
         return f"{items[0]} and {items[1]}"
     return ", ".join(items[:-1]) + ", and " + items[-1]
 
-def orchestrate_download(folder_id: str, api_key: str = None, download_dir: str = None) -> (pl.DataFrame, GoogleDrive):
+def orchestrate_download(folder_id: str, download_dir: str = None) -> (pl.DataFrame, GoogleDrive):
     """due to the nature of extreme variability in document file types, we will ask the user what is to be downloaded and warn if there is support for the stated file types"""
     gdrive_instance = GoogleDrive(
         folder_id=folder_id,
-        api_key=api_key,
         download_dir=download_dir)
     all_files_df = gdrive_instance.scan_all_files()
 
@@ -59,8 +58,7 @@ def orchestrate_download(folder_id: str, api_key: str = None, download_dir: str 
 
             if incompatible_types:
                 incompatible_str = format_list_with_and(incompatible_types)
-                print(f"\nWarning: The following types are not supported: {incompatible_str}")
-                
+                print(f"\nWarning: The following types are not supported: {incompatible_str}") 
                 proceed = input("Continue with supported types only? (y/n): ").strip().lower()
                 if proceed != 'y':
                     print("Please try again.")
@@ -88,17 +86,16 @@ def download_files(df: pl.DataFrame, gdrive_instance: GoogleDrive) -> pl.DataFra
     download_results = []
 
     for i, row in enumerate(df.iter_rows(named=True)):
-        if i == 100:
-            break
     
         status = gdrive_instance.download_file(row)
         print(status)
 
-        err_flag = ('Error' in status or 'Skipped' in status)
+        err_flag = ('Error' in status) 
 
         download_results.append({
             'id': row['id'],
-            'error': err_flag
+            'error': err_flag,
+            'local_path': row.get('local_path', None)
         })
 
     down_results_df = pl.DataFrame(
@@ -112,10 +109,10 @@ def download_files(df: pl.DataFrame, gdrive_instance: GoogleDrive) -> pl.DataFra
 
     return final_df
 
-def main(folder_id: str, api_key: str = None, download_dir: str = None):
+def main(folder_id: str, download_dir: str = None):
+    # TODO: persist dataframe to disk, if records exist update, if not append, ensure uniqueness
     filtered_df, gdrive_instance = orchestrate_download(
         folder_id=folder_id,
-        api_key=api_key,
         download_dir=download_dir)
 
     if filtered_df is None:
