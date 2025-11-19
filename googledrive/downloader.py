@@ -1,13 +1,10 @@
 import sys
-import os
+from pathlib import Path
 import polars as pl
 from typing import List
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
-
-from gdrive_base import GoogleDrive
+from googledrive.gdrive_base import GoogleDrive
 from models import ProcessableFileTypes
+
 
 def format_list_with_and(items: list[str]) -> str:
     if not items:
@@ -94,7 +91,7 @@ def download_files(df: pl.DataFrame, gdrive_instance: GoogleDrive) -> pl.DataFra
 
         download_results.append({
             'id': row['id'],
-            'error': err_flag,
+            'download_error': err_flag,
             'local_path': row.get('local_path', None)
         })
 
@@ -102,7 +99,7 @@ def download_files(df: pl.DataFrame, gdrive_instance: GoogleDrive) -> pl.DataFra
     data=download_results,
     schema={
         'id': pl.Utf8,
-        'error': pl.Boolean
+        'download_error': pl.Boolean
     })
 
     final_df = df.join(down_results_df, on="id", how="left")
@@ -119,18 +116,18 @@ def main(folder_id: str, download_dir: str = None):
         return
 
     download_results_df = download_files(df=filtered_df, gdrive_instance=gdrive_instance)
-    total_errs = download_results_df['error'].sum()
+    total_errs = download_results_df['download_error'].sum()
     print(f'\nDownload process finished. Total Errors: {total_errs}')
     if total_errs > 0:
         print("Shall we proceed with a retry of the rows with errors? (y/n):")
         resp = input()
         if resp.lower().strip() == 'y':
-            errs_df = download_results_df.filter(pl.col('error') == True)
+            errs_df = download_results_df.filter(pl.col('download_error') == True)
             retry_results_df = download_files(df=errs_df, gdrive_instance=gdrive_instance)
             
             final_results_df = download_results_df.update(retry_results_df, on='id')
             
-            final_errs = final_results_df['error'].sum()
+            final_errs = final_results_df['download_error'].sum()
             print(f"Second download complete. Errors: {final_errs}. Please investigate further.")
         else:
             return

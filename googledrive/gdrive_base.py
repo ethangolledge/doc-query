@@ -64,14 +64,14 @@ class GoogleDrive:
 
     def scan_all_files(self) -> pl.DataFrame:
         """recursively scans the Google Drive folder and returns a list of all files"""
-        all_files: List[Dict] = [] # needs to be statically typed
+        all_files: List[Dict] = []
         print('Starting a full scan of the Google Drive folder... Please bear with, this may take a while.')
         self._scan_recursive(self.folder_id, all_files)
         print(f"Scan complete. Found {len(all_files)} total files.")
 
         for f in all_files:
             f['gdrive_path'] = self._get_full_path(f)
-            f['local_path'] = None # handled in download_file
+            f['local_path'] = None # handled in download_fileprint(download_dir)
 
         df = pl.DataFrame(
             data = all_files,

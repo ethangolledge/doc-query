@@ -1,14 +1,9 @@
-import os
+from pathlib import Path
 import sys
 import polars as pl
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-# googledrive subfolder to sys.path
-sys.path.insert(0, os.path.join(project_root, 'googledrive'))
-
-from downloader import orchestrate_download
-from gdrive_base import GoogleDrive
-
+from duckdb.handler import LocalDB
+from googledrive.downloader import orchestrate_download
+from googledrive.gdrive_base import GoogleDrive
 
 class SampleDownload:
     def __init__(
@@ -28,7 +23,7 @@ class SampleDownload:
 
         for i, row in enumerate(df.iter_rows(named=True)):
             # loop first 100 rows
-            if i == 100:
+            if i == 10:
                 break
             
             status = gdrive_instance.download_file(row)
@@ -57,10 +52,12 @@ class SampleDownload:
         download_df, gdrive_instance = orchestrate_download(
             folder_id=self.folder_id,
             download_dir=self.download_dir)
-
-        return self.download_files(df = download_df, gdrive_instance = gdrive_instance)
+        download_df = self.download_files(df = download_df, gdrive_instance = gdrive_instance)
+        #Local_DB.insert_df_tracking_table(download_df)
+        return
 
 if __name__ == '__main__':
     FOLDER_ID = '1hTNH5woIRio578onLGElkTWofUSWRoH_'
     sample = SampleDownload(folder_id=FOLDER_ID)
     sample.main()
+
